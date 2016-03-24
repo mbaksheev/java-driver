@@ -2,6 +2,8 @@
 
 ### 3.0.1 (in progress)
 
+- [bug] JAVA-1095: Check protocol version for custom payload before sending the query.
+
 
 ### 3.0.0
 
