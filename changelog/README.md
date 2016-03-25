@@ -2,6 +2,8 @@
 
 ### 3.0.1 (in progress)
 
+- [improvement] JAVA-1086: Support Cassandra 3.2 CAST function in QueryBuilder.
+
 
 ### 3.0.0
 

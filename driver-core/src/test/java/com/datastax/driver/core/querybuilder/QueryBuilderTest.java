@@ -137,6 +137,14 @@ public class QueryBuilderTest {
         select = select().from("foo").where(containsKey("e", "key1"));
         assertEquals(select.toString(), query);
 
+        query = "SELECT CAST(writetime(country) AS text) FROM artists LIMIT 2;";
+        select = select().cast(fcall("writetime", column("country")), DataType.text()).from("artists").limit(2);
+        assertEquals(select.toString(), query);
+
+        query = "SELECT CAST(writetime(country) AS text) FROM artists LIMIT 2;";
+        select = select().raw("CAST(writetime(country) AS text)").from("artists").limit(2);
+        assertEquals(select.toString(), query);
+
         try {
             select().countAll().from("foo").orderBy(asc("a"), desc("b")).orderBy(asc("a"), desc("b"));
             fail();
