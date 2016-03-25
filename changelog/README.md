@@ -2,6 +2,8 @@
 
 ### 3.0.1 (in progress)
 
+- [improvement] JAVA-1113: Support Cassandra 3.4 LIKE operator in QueryBuilder.
+
 
 ### 3.0.0
 
