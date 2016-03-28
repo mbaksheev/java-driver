@@ -196,7 +196,7 @@ public class RecommissionedNodeTest {
         // Expect :
         // - 2 connections for the live host (1 control connection + 1 pooled connection)
         // - 1 attempt for the host with the wrong protocol version.
-        verify(socketOptions, times(3)).getKeepAlive();
+        verify(socketOptions, times(4)).getKeepAlive();
 
         // Node 1 should now be DOWN with no reconnection attempt
         assertThat(mainCluster).host(1)
