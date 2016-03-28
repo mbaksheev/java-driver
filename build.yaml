@@ -5,9 +5,7 @@ java:
 os:
   - ubuntu/trusty64
 cassandra:
-  - 1.2
   - 2.0
-  - 2.1
 build:
   - type: maven
     version: 3.2.5
@@ -21,18 +19,7 @@ build:
       failIfNoTests=false
       maven.test.failure.ignore=true
       maven.javadoc.skip=true
-  - type: maven
-    version: 3.2.5
-    goals: verify --fail-never -Pisolated
-    properties: |
-      com.datastax.driver.TEST_BASE_NODE_WAIT=120
-      com.datastax.driver.NEW_NODE_DELAY_SECONDS=100
-      cassandra.version=$CCM_CASSANDRA_VERSION
-      ccm.java.home=$CCM_JAVA_HOME
-      ccm.path=$CCM_JAVA_HOME/bin
-      failIfNoTests=false
-      maven.test.failure.ignore=true
-      maven.javadoc.skip=true
+      test=RecommissionedNodeTest#should_ignore_node_that_does_not_support_protocol_version_on_session_init
   - xunit:
     - "**/target/surefire-reports/TEST-*.xml"
     - "**/target/failsafe-reports/TEST-*.xml" 
