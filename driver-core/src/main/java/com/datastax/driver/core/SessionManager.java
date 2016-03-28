@@ -363,17 +363,28 @@ class SessionManager extends AbstractSession {
 
                     @Override
                     public void onFailure(Throwable t) {
+                        ListenableFuture<?> downFuture = null;
                         if (t instanceof UnsupportedProtocolVersionException) {
                             cluster.manager.logUnsupportedVersionProtocol(host, ((UnsupportedProtocolVersionException) t).unsupportedVersion);
-                            cluster.manager.triggerOnDown(host, false);
+                            downFuture = cluster.manager.triggerOnDown(host, false);
                         } else if (t instanceof ClusterNameMismatchException) {
                             ClusterNameMismatchException e = (ClusterNameMismatchException) t;
                             cluster.manager.logClusterNameMismatch(host, e.expectedClusterName, e.actualClusterName);
-                            cluster.manager.triggerOnDown(host, false);
+                            downFuture = cluster.manager.triggerOnDown(host, false);
                         } else {
                             logger.warn("Error creating pool to " + host, t);
                         }
-                        future.set(false);
+                        if (downFuture != null) {
+                            // Don't mark the future as complete until onDown completes.
+                            downFuture.addListener(new Runnable() {
+                                @Override
+                                public void run() {
+                                    future.set(false);
+                                }
+                            }, MoreExecutors.sameThreadExecutor());
+                        } else {
+                            future.set(false);
+                        }
                     }
                 });
                 return future;

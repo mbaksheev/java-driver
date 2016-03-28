@@ -29,7 +29,9 @@ import static com.datastax.driver.core.Assertions.assertThat;
 import static com.datastax.driver.core.Assertions.fail;
 import static com.datastax.driver.core.Host.State.DOWN;
 import static com.datastax.driver.core.Host.State.UP;
+import static com.datastax.driver.core.HostDistance.LOCAL;
 import static com.datastax.driver.core.TestUtils.nonDebouncingQueryOptions;
+import static org.mockito.Mockito.*;
 
 /**
  * Due to C* gossip bugs, system.peers may report nodes that are gone from the cluster.
@@ -43,6 +45,23 @@ public class RecommissionedNodeTest {
     CCMBridge.Builder mainCcmBuilder, otherCcmBuilder;
     CCMAccess mainCcm, otherCcm;
     Cluster mainCluster;
+
+    // We want to count how many connections were attempted. For that, we rely on the fact that SocketOptions.getKeepAlive
+    // is called in Connection.Factory.newBootstrap() each time we prepare to open a new connection.
+    SocketOptions socketOptions = spy(new SocketOptions());
+
+    // Force 1 connection per pool. Otherwise we can't distinguish a failed pool creation from multiple connection
+    // attempts, because pools create their connections in parallel (so 1 pool failure equals multiple connection failures).
+    PoolingOptions poolingOptions = new PoolingOptions().setConnectionsPerHost(LOCAL, 1, 1);
+
+    private Cluster.Builder builder() {
+        return Cluster.builder().addContactPoint(TestUtils.IP_PREFIX + "2")
+                .addContactPoints(mainCcm.addressOfNode(2).getAddress())
+                .withPort(mainCcm.getBinaryPort())
+                .withPoolingOptions(poolingOptions)
+                .withSocketOptions(socketOptions)
+                .withQueryOptions(nonDebouncingQueryOptions());
+    }
 
     @DataProvider
     Object[][] runManyTimes() {
@@ -63,10 +82,7 @@ public class RecommissionedNodeTest {
         mainCcm.waitForDown(1);
 
         // Now start the driver that will connect to node2 and node3, and consider node1 down
-        mainCluster = Cluster.builder()
-                .addContactPoints(mainCcm.addressOfNode(2).getAddress())
-                .withPort(mainCcm.getBinaryPort())
-                .withQueryOptions(nonDebouncingQueryOptions()).build();
+        mainCluster = builder().build();
         mainCluster.connect();
         waitForCountUpHosts(mainCluster, 2);
         // From that point, reconnections to node1 have been scheduled.
@@ -94,10 +110,7 @@ public class RecommissionedNodeTest {
         mainCcm.waitForDown(1);
 
         // Start the driver, the control connection will be on node2
-        mainCluster = Cluster.builder()
-                .addContactPoints(mainCcm.addressOfNode(2).getAddress())
-                .withPort(mainCcm.getBinaryPort())
-                .withQueryOptions(nonDebouncingQueryOptions()).build();
+        mainCluster = builder().build();
         mainCluster.connect();
         waitForCountUpHosts(mainCluster, 1);
 
@@ -135,10 +148,7 @@ public class RecommissionedNodeTest {
         otherCcm.waitForUp(1);
 
         // Start the driver, it should only connect to node 2
-        mainCluster = Cluster.builder()
-                .addContactPoints(mainCcm.addressOfNode(2).getAddress())
-                .withPort(mainCcm.getBinaryPort())
-                .withQueryOptions(nonDebouncingQueryOptions()).build();
+        mainCluster = builder().build();
 
         // When we first initialize the Cluster, all hosts are marked UP
         assertThat(mainCluster).host(2).hasState(UP);
@@ -146,6 +156,11 @@ public class RecommissionedNodeTest {
 
         // Create a session. This will try to open a pool to node 1 and find out that the cluster name doesn't match.
         mainCluster.connect();
+
+        // Expect :
+        // - 2 connections for the live host (1 control connection + 1 pooled connection)
+        // - 1 attempt for the host with the wrong cluster name.
+        verify(socketOptions, times(3)).getKeepAlive();
 
         // Node 1 should now be DOWN with no reconnection attempt
         assertThat(mainCluster).host(1)
@@ -173,13 +188,15 @@ public class RecommissionedNodeTest {
         otherCcm.waitForUp(1);
 
         // Start the driver, it should only connect to node 2
-        mainCluster = Cluster.builder()
-                .addContactPoints(mainCcm.addressOfNode(2).getAddress())
-                .withPort(mainCcm.getBinaryPort())
-                .withQueryOptions(nonDebouncingQueryOptions()).build();
+        mainCluster = builder().build();
 
         // Create a session. This will try to open a pool to node 1 and find that it doesn't support protocol version.
         mainCluster.connect();
+
+        // Expect :
+        // - 2 connections for the live host (1 control connection + 1 pooled connection)
+        // - 1 attempt for the host with the wrong protocol version.
+        verify(socketOptions, times(3)).getKeepAlive();
 
         // Node 1 should now be DOWN with no reconnection attempt
         assertThat(mainCluster).host(1)
@@ -200,6 +217,7 @@ public class RecommissionedNodeTest {
 
     @AfterMethod(groups = "long", alwaysRun = true)
     public void teardown() {
+        reset(socketOptions);
         if (mainCluster != null)
             mainCluster.close();
         if (mainCcmBuilder != null)
