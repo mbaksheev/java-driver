@@ -1679,9 +1679,13 @@ public class Cluster implements Closeable {
         }
 
         void logUnsupportedVersionProtocol(Host host, ProtocolVersion version) {
-            logger.warn("Detected added or restarted Cassandra host {} but ignoring it since it does not support the version {} of the native "
-                    + "protocol which is currently in use. If you want to force the use of a particular version of the native protocol, use "
-                    + "Cluster.Builder#usingProtocolVersion() when creating the Cluster instance.", host, version);
+            try {
+                throw new Exception("Catch me");
+            } catch (Exception e) {
+                logger.warn("Detected added or restarted Cassandra host {} but ignoring it since it does not support the version {} of the native "
+                        + "protocol which is currently in use. If you want to force the use of a particular version of the native protocol, use "
+                        + "Cluster.Builder#usingProtocolVersion() when creating the Cluster instance.", host, version, e);
+            }
         }
 
         void logClusterNameMismatch(Host host, String expectedClusterName, String actualClusterName) {

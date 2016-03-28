@@ -20,6 +20,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import java.util.concurrent.TimeUnit;
@@ -42,6 +43,15 @@ public class RecommissionedNodeTest {
     CCMBridge.Builder mainCcmBuilder, otherCcmBuilder;
     CCMAccess mainCcm, otherCcm;
     Cluster mainCluster;
+
+    @DataProvider
+    Object[][] runManyTimes() {
+        Object[][] arr = new Object[1024][1];
+        for (int i = 0; i < 1024; i++) {
+            arr[i][0] = i;
+        }
+        return arr;
+    }
 
     @Test(groups = "long")
     public void should_ignore_recommissioned_node_on_reconnection_attempt() throws Exception {
@@ -144,9 +154,10 @@ public class RecommissionedNodeTest {
                 .isNotReconnectingFromDown();
     }
 
-    @Test(groups = "long")
+    @Test(groups = "long", dataProvider = "runManyTimes")
     @CassandraVersion(major = 2.0)
-    public void should_ignore_node_that_does_not_support_protocol_version_on_session_init() throws Exception {
+    public void should_ignore_node_that_does_not_support_protocol_version_on_session_init(int iteration) throws Exception {
+        logger.debug("Beginning iteration {}", iteration);
         // Simulate the bug before starting the cluster
         mainCcmBuilder = CCMBridge.builder().withNodes(2);
         mainCcm = CCMCache.get(mainCcmBuilder);
